@@ -1,0 +1,98 @@
+package com.example.pvpmod;
+
+import net.fabricmc.api.ModInitializer;
+
+public class PvPMod implements ModInitializer {
+    @Override
+    public void onInitialize() {
+        System.out.println("PvP Mod загружен — работает подсветка цели");
+    }
+}
+package com.example.pvpmod.mixin;
+
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.OutlineVertexConsumerProvider;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.WorldRenderer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(WorldRenderer.class)
+public class HighlightMixin {
+
+    @Inject(method = "renderEntity", at = @At("HEAD"))
+    private void beforeRenderEntity(Entity entity, double cameraX, double cameraY, double cameraZ, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, CallbackInfo ci) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null || client.getCameraEntity() == null) return;
+
+        // Проверяем, смотрит ли игрок на этого энтити
+        HitResult hit = client.getCameraEntity().raycast(6.0, tickDelta, false);
+        if (hit instanceof EntityHitResult entityHit && entityHit.getEntity() == entity) {
+            // Если да — применяем контур
+            if (vertexConsumers instanceof OutlineVertexConsumerProvider outline) {
+                outline.setColor(0xFF0000); // Красный цвет (0xRRGGBB, можно 0x00FF00 для зелёного)
+                entity.setGlowing(true);    // форсируем свечение
+            }
+        } else {
+            // Сбрасываем свечение для остальных
+            if (entity instanceof PlayerEntity) {
+                entity.setGlowing(false);
+            }
+        }
+    }
+}
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.example.pvpmod.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [],
+  "client": [
+    "HighlightMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
+{
+  "schemaVersion": 1,
+  "id": "pvpmod",
+  "version": "1.0.0",
+  "name": "PvP Highlight Mod",
+  "description": "Подсветка игрока, на которого смотришь",
+  "authors": ["You"],
+  "contact": {},
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "main": ["com.example.pvpmod.PvPMod"]
+  },
+  "mixins": ["pvpmod.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "~1.20.4",
+    "java": ">=17",
+    "fabric-api": "*"
+  }
+}
+plugins {
+    id 'fabric-loom' version '1.6-SNAPSHOT'
+}
+
+loom {
+    mixin.defaultRefmapName.set("pvpmod.refmap.json")
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:1.20.4"
+    mappings "net.fabricmc:yarn:1.20.4+build.1:v2"
+    modImplementation "net.fabricmc:fabric-loader:0.15.11"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:0.91.0+1.20.4"
+}

@@ -12,6 +12,7 @@ PvPMod/
 │   └── fabric.mod.json
 ├── build.gradle
 └── gradle.properties
+PvPMod.java
 package com.example.pvpmod;
 
 import net.fabricmc.api.ModInitializer;
@@ -27,6 +28,41 @@ public class PvPMod implements ModInitializer {
         LOGGER.info("PvP Mod загружен!");
     }
 }
+PvPModClient.Java
+package com.example.pvpmod;
+
+import com.example.pvpmod.gui.PvPModScreen;
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
+import org.lwjgl.glfw.GLFW;
+
+public class PvPModClient implements ClientModInitializer {
+    
+    public static boolean HIGHLIGHT_ENABLED = true;
+    private static KeyBinding openMenuKey;
+    
+    @Override
+    public void onInitializeClient() {
+        // Кнопка RShift
+        openMenuKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+            "key.pvpmod.open_menu",
+            InputUtil.Type.KEYSYM,
+            GLFW.GLFW_KEY_RIGHT_SHIFT,
+            "category.pvpmod"
+        ));
+        
+        // Обработчик нажатия
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (openMenuKey.wasPressed() && client.player != null) {
+                client.setScreen(new PvPModScreen());
+            }
+        });
+    }
+}
+gui/PvPModScreen.java
 package com.example.pvpmod.gui;
 
 import com.example.pvpmod.PvPModClient;
@@ -84,6 +120,7 @@ public class PvPModScreen extends Screen {
         return false;
     }
 }
+HighlightMixin.java
 package com.example.pvpmod.mixin;
 
 import com.example.pvpmod.PvPModClient;
@@ -128,6 +165,7 @@ public class HighlightMixin<T extends Entity> {
         }
     }
 }
+src/main/resources/pvpmod.mixins.json
 {
   "required": true,
   "minVersion": "0.8",
@@ -140,6 +178,7 @@ public class HighlightMixin<T extends Entity> {
     "defaultRequire": 1
   }
 }
+src/main/resources/fabric.mod.json
 {
   "schemaVersion": 1,
   "id": "pvpmod",
@@ -163,6 +202,7 @@ public class HighlightMixin<T extends Entity> {
     "fabric-api": "*"
   }
 }
+src/main/resources/asstes/pvpmod/lang/en_us.json
 {
   "key.pvpmod.open_menu": "Открыть меню мода",
   "category.pvpmod": "PvP Mod"

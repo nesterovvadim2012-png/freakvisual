@@ -1,0 +1,199 @@
+PvPMod/
+├── src/main/java/com/example/pvpmod/
+│   ├── PvPMod.java
+│   ├── PvPModClient.java
+│   ├── HighlightMixin.java
+│   └── gui/
+│       └── PvPModScreen.java
+├── src/main/resources/
+│   ├── assets/pvpmod/lang/
+│   │   └── en_us.json
+│   ├── pvpmod.mixins.json
+│   └── fabric.mod.json
+├── build.gradle
+└── gradle.properties
+package com.example.pvpmod;
+
+import net.fabricmc.api.ModInitializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class PvPMod implements ModInitializer {
+    public static final String MOD_ID = "pvpmod";
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+    @Override
+    public void onInitialize() {
+        LOGGER.info("PvP Mod загружен!");
+    }
+}
+package com.example.pvpmod.gui;
+
+import com.example.pvpmod.PvPModClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+
+public class PvPModScreen extends Screen {
+    
+    public PvPModScreen() {
+        super(Text.literal("PvP Mod Menu"));
+    }
+    
+    @Override
+    protected void init() {
+        // Кнопка включения/выключения подсветки
+        ButtonWidget highlightButton = ButtonWidget.builder(
+            getHighlightButtonText(),
+            button -> {
+                PvPModClient.HIGHLIGHT_ENABLED = !PvPModClient.HIGHLIGHT_ENABLED;
+                button.setMessage(getHighlightButtonText());
+            }
+        ).dimensions(width / 2 - 100, height / 2 - 20, 200, 20).build();
+        
+        addDrawableChild(highlightButton);
+        
+        // Кнопка закрытия
+        ButtonWidget closeButton = ButtonWidget.builder(
+            Text.literal("Закрыть"),
+            button -> close()
+        ).dimensions(width / 2 - 100, height / 2 + 20, 200, 20).build();
+        
+        addDrawableChild(closeButton);
+    }
+    
+    private Text getHighlightButtonText() {
+        if (PvPModClient.HIGHLIGHT_ENABLED) {
+            return Text.literal("Подсветка игрока: " + Formatting.GREEN + "ВКЛ");
+        } else {
+            return Text.literal("Подсветка игрока: " + Formatting.RED + "ВЫКЛ");
+        }
+    }
+    
+    @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        renderBackground(context, mouseX, mouseY, delta);
+        context.drawCent TextWithShadow(textRenderer, "PvP Mod", width / 2, height / 2 - 60, 0xFFFFFF);
+        super.render(context, mouseX, mouseY, delta);
+    }
+    
+    @Override
+    public boolean shouldPause() {
+        return false;
+    }
+}
+package com.example.pvpmod.mixin;
+
+import com.example.pvpmod.PvPModClient;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.OutlineVertexConsumerProvider;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.entity.EntityRenderer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.hit.EntityHitResult;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(EntityRenderer.class)
+public class HighlightMixin<T extends Entity> {
+    
+    @Inject(method = "render", at = @At("HEAD"))
+    private void onRender(T entity, float yaw, float tickDelta, MatrixStack matrices, 
+                          VertexConsumerProvider vertexConsumers, int light, CallbackInfo ci) {
+        
+        // Проверяем, включена ли функция
+        if (!PvPModClient.HIGHLIGHT_ENABLED) return;
+        
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null || client.getCameraEntity() == null) return;
+        
+        // Смотрим, на кого наведён прицел
+        var hit = client.getCameraEntity().raycast(6.0, tickDelta, false);
+        
+        if (hit instanceof EntityHitResult entityHit && entityHit.getEntity() == entity && entity instanceof PlayerEntity) {
+            // Включаем красный контур
+            if (vertexConsumers instanceof OutlineVertexConsumerProvider outline) {
+                outline.setColor(0xFF0000);
+                entity.setGlowing(true);
+            }
+        } else if (entity instanceof PlayerEntity) {
+            // Снимаем подсветку с остальных
+            entity.setGlowing(false);
+        }
+    }
+}
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.example.pvpmod.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "HighlightMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
+{
+  "schemaVersion": 1,
+  "id": "pvpmod",
+  "version": "1.0.0",
+  "name": "PvP Mod",
+  "description": "Мод с меню по RShift и подсветкой игрока",
+  "authors": ["You"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/pvpmod/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "main": ["com.example.pvpmod.PvPMod"],
+    "client": ["com.example.pvpmod.PvPModClient"]
+  },
+  "mixins": ["pvpmod.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
+{
+  "key.pvpmod.open_menu": "Открыть меню мода",
+  "category.pvpmod": "PvP Mod"
+}
+plugins {
+    id 'fabric-loom' version '1.9-SNAPSHOT'
+}
+
+version = "1.0.0"
+group = "com.example"
+
+base {
+    archivesName = "pvpmod"
+}
+
+loom {
+    splitEnvironmentSourceSets()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:1.21.4"
+    mappings "net.fabricmc:yarn:1.21.4+build.1:v2"
+    modImplementation "net.fabricmc:fabric-loader:0.16.9"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:0.108.0+1.21.4"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+}
+org.gradle.jvmargs=-Xmx2G
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
